@@ -1,0 +1,222 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset = 'utf-8'>
+<title> hackathon </title>
+<script src = "pixi.js"></script>
+</head>
+<body>
+<script>
+var Container = PIXI.Container,
+    autoDetectRenderer = PIXI.autoDetectRenderer,
+    loader = PIXI.loader,
+    resources = PIXI.loader.resources,
+    Sprite = PIXI.Sprite;
+    TextureCache = PIXI.utils.TextureCache;
+    Rectangle = PIXI.Rectangle;
+    Texture = PIXI.Texture;
+    Graphics = PIXI.Graphics;
+
+var stage = new Container(),
+renderer = autoDetectRenderer(
+ 	350, 350, 
+ 	{transparent: true}
+ ),
+state, passages, ts; 
+var roomTex = [], 
+passageTex = [], 
+itemTex = [],
+rooms = [];
+var itemCounter = passageCounter = 0;
+
+document.body.appendChild(renderer.view);
+loader
+	.add("img/tileset.json")
+	.load(setup);
+
+
+function setup () {
+	// console.log('Successfully');
+	ts = resources["img/tileset.json"].textures;
+	// room = new Sprite(ts["room1.png"]);
+	// stage.addChild(room);
+	
+	roomTex.push(ts["room1.png"], ts["room2.png"], ts["room3.png"],
+		ts["room4.png"], ts["room5.png"]);
+
+	itemTex.push(ts["circle.png"]);	
+
+	passageTex.push(ts["passage1.png"], ts["passage2.png"]);
+
+	for (var i = 0; i<5; i++) {
+		rooms.push(createRoom(i, roomTex[i], [], []));
+	}
+   //-----------------------------------------------------------
+
+   	rooms[0].createPassage(passageTex[0], rooms[3], onCenterX(passageTex[0], -50), 20);
+   	rooms[0].createPassage(null, rooms[1], renderer.width-60,(renderer.height-250)/2, 60, 250); // optimize!;
+   	rooms[1].createPassage(null, rooms[2], renderer.width-60,(renderer.height-250)/2, 60, 250); 
+   	rooms[1].createPassage(null, rooms[0], 0,(renderer.height-250)/2, 60, 250); 
+   	rooms[1].createPassage(passageTex[1], rooms[4], onCenterX(passageTex[1]), fromEdgeY(passageTex[1],110));
+   	rooms[2].createPassage(null, rooms[1], 0,(renderer.height-250)/2, 60, 250); 
+   	rooms[2].createItem(itemTex[0], true, fromEdgeX(itemTex[0]), fromEdgeY(itemTex[0],-50));
+   	rooms[3].createPassage(passageTex[1], rooms[0], onCenterX(passageTex[1]), fromEdgeY(passageTex[1],110));
+   	rooms[4].createPassage(passageTex[1], rooms[1], onCenterX(passageTex[1]), 0);
+   	rooms[4].createItem(itemTex[0], true, fromEdgeX(itemTex[0]), fromEdgeY(itemTex[0],-50));
+
+
+   	// rooms[0].createPassage(passageTex[0], rooms[3], fromEdgeX(passageTex[0]), 0);
+
+  //  	rooms[3].createPassage(passageTex[1], rooms[0], onCenterX(passageTex[1]), 320);
+
+  //  	rooms[2].createItem(itemTex[0], true, fromEdge(itemTex[0]), 
+		// onCenterY(itemTex[0], -40));
+	
+	// var pass1 = rooms[3].createPassage(passageTex[0], rooms[2], 100, 100);
+	//  !!! var pass1 =
+	// rooms[2].createPassage(null, rooms[1], 0, ((renderer.height-200)/2), 80, 200);
+
+	stage.addChild(rooms[0]);
+	//-----------------------------------------------------------
+	state = play;
+	gameLoop();
+}
+function gameLoop() {
+	requestAnimationFrame (gameLoop);
+	state();
+	renderer.render(stage);
+}
+function play () {
+	
+};
+
+// methods of the room should be in the room creating block!
+
+
+function createRoom (ID, texture, passage, item) { // p, i
+	var room = new Container();
+	room.TYPE = "room";
+	room.ID = ID;
+	room.passage = passage;
+	room.item = item; 
+	var sprite = new Sprite (texture);
+	room.createItem = createItem;
+	room.createPassage = createPassage;
+	room.addChild(sprite);
+	return room;
+}
+
+function createPassage (texture, destination, x, y, w, h) {
+	var passage;
+	if (texture) {
+		passage = new Sprite(texture);
+		passage.x = x || 0;
+		passage.y = y || 0;
+	
+	passage
+
+        .on('mouseover', onButtonOverH)
+        .on('mouseout', onButtonOutH)
+	} 
+	else {
+		// passage = new Rectangle (x, y, w, h);
+		passage = new Graphics();
+		passage.beginFill(0x66CCFF);
+		passage.drawRect(x, y, w, h);
+		passage.alpha = 0;
+		passage.endFill();
+	}
+
+	passageCounter++;	// shorter;
+	passage.ID = passageCounter;
+	passage.startpoint = this;
+	passage.destination = destination;
+	passage.interactive = true;	
+	passage.buttonMode = true;
+
+	passage
+
+		.on('mousedown', onButtonDownPass)
+    	.on('touchstart', onButtonDownPass)
+
+
+	this.addChild(passage);
+	this.passage.push(passage);
+	return passage;
+}
+function createItem (texture, handheld, x, y) {
+	var item = new Sprite (texture);
+	itemCounter++; // shorter;
+	item.ID = itemCounter;
+	item.x = x || 0;
+	item.y = y || 0;	
+	item.handheld = handheld;
+	if (this.TYPE == "room") {  // ???
+		this.addChild(item);
+		this.item.push(item);
+	}
+	if (handheld) {
+		item.interactive = true;	
+		item.buttonMode = true;	
+		// console.log('Catch!');
+	item
+		.on('mousedown', onButtonDownH)
+        .on('touchstart', onButtonDownH)
+        .on('mouseover', onButtonOverH)
+
+        .on('mouseout', onButtonOutH)
+	} else {
+		// console.log('It\'s an animation');
+	}	
+	return item;
+}
+
+function onButtonDownH () {
+	this.visible = false;
+	document.getElementById('pocket').value++;
+	this.isdown = false; 
+}
+function onButtonOverH () {
+	this.isOver = true;
+	this.alpha = 0.8;	
+}
+function onButtonOutH () {
+	this.isOver = false;
+	this.alpha = 1;
+}
+
+function onButtonDownPass () {
+	stage.removeChild(this.startpoint);
+	stage.addChild(this.destination);
+	// this.startpoint.visible = false; ??
+	// this.destination.visible = true; ??
+	this.isdown = false; 
+}
+function onCenterX (texture, offset) {
+	var pos = (renderer.width-texture.width)/2;
+	if (offset) pos+= offset;
+	return pos;
+
+}
+function onCenterY (texture, offset) {
+	var pos = (renderer.height-texture.height)/2;
+	if (offset) pos+= offset;
+	return pos;
+}
+
+function fromEdgeX (texture, offset) {
+	var pos = renderer.width-texture.width;
+	if (offset) pos+= offset;
+	return pos;
+}
+
+function fromEdgeY (texture, offset) {
+	var pos = renderer.height-texture.height;
+	if (offset) pos+= offset;
+	return pos;
+}
+</script>
+<p> Предметов в рюкзаке:
+<input type="text" readonly id ="pocket" value = "" size="1"> </p>
+</body>
+</html>
